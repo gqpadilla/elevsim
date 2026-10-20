@@ -10,6 +10,7 @@ public class Main {
         System.out.println("=================================");
         printConfig();
         testRequests();
+        testElevator();
         System.out.println("Simulation not implemented yet.");
         // TODO: start the simulation here once the classes exist
     }
@@ -30,6 +31,22 @@ public class Main {
         int from = 5;
         int to = 5;
         System.out.println("  " + from + " -> " + to + " valid? " + Request.isValid(from, to));
+        System.out.println();   // blank line before the next message
+    }
+
+    // Moves one elevator through its stops, one floor per call, printing every step.
+    private static void testElevator() {
+        System.out.println("Elevator:");
+        Elevator e = new Elevator(1);
+        e.addStop(10);
+        e.addStop(3);
+        System.out.println("  " + e);
+
+        // Loop ends when the last stop is reached, so the elevator is idle at floor 3.
+        while (e.hasStops()) {
+            e.moveOneStep();
+            System.out.println("  " + e);
+        }
         System.out.println();   // blank line before the next message
     }
 
