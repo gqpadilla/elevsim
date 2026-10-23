@@ -2,10 +2,12 @@ package elevatorsim;
 
 import java.util.ArrayList;
 
-// One elevator car. For now it moves only when moveOneStep() is called by hand (no threads yet).
+// One elevator car. Each elevator runs on its own thread (see run()).
 // ref: https://www.geeksforgeeks.org/java/arraylist-in-java/
 // idea: stops are kept in an ArrayList in the order they were added, the first one is served first
-public class Elevator {
+// ref: https://www.geeksforgeeks.org/java/runnable-interface-in-java/
+// idea: run() is the code a thread executes, so each elevator gets its own run() loop
+public class Elevator implements Runnable {
 
     private int id;
     private int currentFloor = Config.BOTTOM_FLOOR;  // every elevator starts in the lobby
@@ -55,6 +57,22 @@ public class Elevator {
                 state = ElevatorState.IDLE;
                 direction = Direction.NONE;
             }
+        }
+    }
+
+    // Runs on the elevator's own thread. Loops forever for now, Day 7 adds a clean stop.
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                if (hasStops()) {
+                    moveOneStep();
+                    System.out.println(Thread.currentThread().getName() + " " + this);
+                }
+                Thread.sleep(Config.FLOOR_TRAVEL_MS);   // sleep so the thread doesn't spin, and so one floor takes visible time
+            }
+        } catch (InterruptedException e) {
+            return;   // interrupt() asks the thread to stop, so just leave run()
         }
     }
 
