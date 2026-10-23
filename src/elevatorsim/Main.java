@@ -51,7 +51,7 @@ public class Main {
         System.out.println();   // blank line before the next message
     }
 
-    // Gives each elevator 2 stops, then moves them all in one loop until every stop is reached.
+    // Gives each elevator 2 stops, then starts one thread per elevator and lets them run.
     private static void testBuilding() throws InterruptedException {
         System.out.println("Building:");
         Building b = new Building();
@@ -65,26 +65,10 @@ public class Main {
         b.getElevator(4).addStop(2);
         b.printStatus();
 
-        // One loop moves all elevators in turns, so if one had to wait (doors open, etc.)
-        // the others would freeze too. That's why next we give each elevator its own thread.
-        while (anyStops(b)) {
-            for (Elevator e : b.getElevators()) {
-                e.moveOneStep();
-            }
-            Thread.sleep(Config.FLOOR_TRAVEL_MS);   // one "tick" = every elevator moves one floor
-            b.printStatus();
-        }
-        System.out.println();   // blank line before the next message
-    }
-
-    // True if at least one elevator still has a stop to reach.
-    private static boolean anyStops(Building b) {
-        for (Elevator e : b.getElevators()) {
-            if (e.hasStops()) {
-                return true;
-            }
-        }
-        return false;
+        b.startAll();
+        Thread.sleep(15000);   // arbitrary, from the plan; elevator 4's trip (57 floors, ~28 s) is still going, the threads don't wait for main
+        System.out.println("main thread done waiting");
+        // TODO: the elevator threads loop forever, so the program doesn't exit by itself yet (Ctrl+C). Day 7 fixes this.
     }
 
     // Prints every value from Config so the settings can be checked at a glance.
