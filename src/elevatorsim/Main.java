@@ -3,7 +3,7 @@ package elevatorsim;
 // Entry point of the program. For now it only prints a banner and the config values.
 public class Main {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         System.out.println("=================================");    // just a divider line for the banner
         System.out.println(" Elevator Simulation (Java Threads)");
         System.out.println(" " + Config.NUM_ELEVATORS + " elevators, " + Config.NUM_FLOORS + " floors");
@@ -11,6 +11,7 @@ public class Main {
         printConfig();
         testRequests();
         testElevator();
+        testBuilding();
         System.out.println("Simulation not implemented yet.");
         // TODO: start the simulation here once the classes exist
     }
@@ -48,6 +49,42 @@ public class Main {
             System.out.println("  " + e);
         }
         System.out.println();   // blank line before the next message
+    }
+
+    // Gives each elevator 2 stops, then moves them all in one loop until every stop is reached.
+    private static void testBuilding() throws InterruptedException {
+        System.out.println("Building:");
+        Building b = new Building();
+        b.getElevator(1).addStop(10);
+        b.getElevator(1).addStop(3);
+        b.getElevator(2).addStop(20);
+        b.getElevator(2).addStop(5);
+        b.getElevator(3).addStop(15);
+        b.getElevator(3).addStop(8);
+        b.getElevator(4).addStop(30);
+        b.getElevator(4).addStop(2);
+        b.printStatus();
+
+        // One loop moves all elevators in turns, so if one had to wait (doors open, etc.)
+        // the others would freeze too. That's why next we give each elevator its own thread.
+        while (anyStops(b)) {
+            for (Elevator e : b.getElevators()) {
+                e.moveOneStep();
+            }
+            Thread.sleep(Config.FLOOR_TRAVEL_MS);   // one "tick" = every elevator moves one floor
+            b.printStatus();
+        }
+        System.out.println();   // blank line before the next message
+    }
+
+    // True if at least one elevator still has a stop to reach.
+    private static boolean anyStops(Building b) {
+        for (Elevator e : b.getElevators()) {
+            if (e.hasStops()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Prints every value from Config so the settings can be checked at a glance.
