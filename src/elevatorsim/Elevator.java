@@ -15,6 +15,10 @@ public class Elevator implements Runnable {
     private Direction direction = Direction.NONE;    // NONE while standing still
     private ArrayList<Integer> stops = new ArrayList<Integer>();
 
+    // ref: https://www.geeksforgeeks.org/java/volatile-keyword-in-java/
+    // idea: volatile so the elevator thread sees the change when the main thread sets it to false
+    private volatile boolean running = true;
+
     public Elevator(int id) {
         this.id = id;
     }
@@ -60,11 +64,11 @@ public class Elevator implements Runnable {
         }
     }
 
-    // Runs on the elevator's own thread. Loops forever for now, Day 7 adds a clean stop.
+    // Runs on the elevator's own thread until stopRunning() is called or the thread is interrupted.
     @Override
     public void run() {
         try {
-            while (true) {
+            while (running) {   // checked every loop, so the thread ends soon after stopRunning()
                 if (hasStops()) {
                     moveOneStep();
                     System.out.println(Thread.currentThread().getName() + " " + this);
@@ -72,8 +76,14 @@ public class Elevator implements Runnable {
                 Thread.sleep(Config.FLOOR_TRAVEL_MS);   // sleep so the thread doesn't spin, and so one floor takes visible time
             }
         } catch (InterruptedException e) {
-            return;   // interrupt() asks the thread to stop, so just leave run()
+            // interrupt() woke the thread up from sleep(), so leave the loop right away
         }
+        System.out.println(Thread.currentThread().getName() + " stopped");
+    }
+
+    // Called from another thread (main) to ask this elevator to finish its loop.
+    public void stopRunning() {
+        running = false;
     }
 
     public int getId() {
