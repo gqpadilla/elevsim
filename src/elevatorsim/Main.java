@@ -51,7 +51,7 @@ public class Main {
         System.out.println();   // blank line before the next message
     }
 
-    // Gives each elevator 2 stops, then starts one thread per elevator and lets them run.
+    // Gives each elevator 2 stops, then runs one thread per elevator for 10 s and stops them.
     private static void testBuilding() throws InterruptedException {
         System.out.println("Building:");
         Building b = new Building();
@@ -66,9 +66,9 @@ public class Main {
         b.printStatus();
 
         b.startAll();
-        Thread.sleep(15000);   // arbitrary, from the plan; elevator 4's trip (57 floors, ~28 s) is still going, the threads don't wait for main
-        System.out.println("main thread done waiting");
-        // TODO: the elevator threads loop forever, so the program doesn't exit by itself yet (Ctrl+C). Day 7 fixes this.
+        Thread.sleep(10000);   // arbitrary, from the plan; long enough to watch the elevators move
+        b.stopAll();
+        System.out.println("all elevator threads finished");
     }
 
     // Prints every value from Config so the settings can be checked at a glance.

@@ -1,10 +1,10 @@
 package elevatorsim;
 
-// The building holds all the elevators. Single-threaded for now: Main moves them one after another.
+// The building holds all the elevators and starts/stops one thread per elevator.
 public class Building {
 
     private Elevator[] elevators = new Elevator[Config.NUM_ELEVATORS];
-    private Thread[] threads = new Thread[Config.NUM_ELEVATORS];  // kept so Day 7 can join() them
+    private Thread[] threads = new Thread[Config.NUM_ELEVATORS];  // kept so stopAll() can interrupt() and join() them
 
     public Building() {
         // ids 1..4 for the elevators, matching the numbers people see on the screen
@@ -36,6 +36,23 @@ public class Building {
         for (int i = 0; i < elevators.length; i++) {
             threads[i] = new Thread(elevators[i], "Elevator-" + elevators[i].getId());
             threads[i].start();
+        }
+    }
+
+    // Stops every elevator thread and waits until all of them have really finished.
+    public void stopAll() throws InterruptedException {
+        for (Elevator e : elevators) {
+            e.stopRunning();
+        }
+        // ref: https://www.geeksforgeeks.org/java/interrupting-a-thread-in-java/
+        // idea: interrupt() wakes a thread up from sleep() so it doesn't wait out the rest of the 500 ms
+        for (Thread t : threads) {
+            t.interrupt();
+        }
+        // ref: https://www.geeksforgeeks.org/java/joining-threads-in-java/
+        // idea: join() makes main wait here until that thread's run() has ended
+        for (Thread t : threads) {
+            t.join();
         }
     }
 }
