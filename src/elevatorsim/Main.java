@@ -12,6 +12,7 @@ public class Main {
         testRequests();
         testElevator();
         testBuilding();
+        testQueue();
         System.out.println("Simulation not implemented yet.");
         // TODO: start the simulation here once the classes exist
     }
@@ -69,6 +70,53 @@ public class Main {
         Thread.sleep(10000);   // arbitrary, from the plan; long enough to watch the elevators move
         b.stopAll();
         System.out.println("all elevator threads finished");
+    }
+
+    // Producer thread adds 5 requests, consumer thread takes and prints them as they arrive.
+    private static void testQueue() throws InterruptedException {
+        System.out.println();
+        System.out.println("Queue:");
+        final RequestQueue queue = new RequestQueue();
+
+        Thread producer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int[][] trips = { {5, 32}, {40, 3}, {1, 50}, {12, 7}, {22, 45} };  // arbitrary sample trips
+                try {
+                    for (int[] t : trips) {
+                        Request r = new Request(0, t[0], t[1]);
+                        System.out.println("  added " + r);   // print before add(), so "added" always shows before "took"
+                        queue.add(r);
+                        Thread.sleep(700);  // arbitrary gap between requests, so each take() has to wait
+                    }
+                } catch (InterruptedException e) {
+                    // not interrupted in this test, nothing to clean up
+                }
+            }
+        }, "Producer");
+
+        Thread consumer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Request r = queue.take();
+                    while (r != null) {     // null means the queue is closed and empty
+                        System.out.println("  took " + r);
+                        r = queue.take();
+                    }
+                } catch (InterruptedException e) {
+                    // not interrupted in this test, nothing to clean up
+                }
+                System.out.println("  consumer done");
+            }
+        }, "Consumer");
+
+        producer.start();
+        consumer.start();
+        producer.join();    // wait until all 5 requests are added
+        queue.close();      // then tell the consumer no more are coming
+        consumer.join();    // wait until it has taken everything and ended
+        System.out.println();   // blank line before the next message
     }
 
     // Prints every value from Config so the settings can be checked at a glance.
