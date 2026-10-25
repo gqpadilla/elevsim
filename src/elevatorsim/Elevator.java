@@ -23,20 +23,25 @@ public class Elevator implements Runnable {
         this.id = id;
     }
 
+    // ref: https://www.geeksforgeeks.org/java/synchronization-in-java/
+    // idea: other threads (main now, the dispatcher later) call these while the elevator thread runs,
+    //       so every method that touches stops/floor/state is synchronized on this elevator
+
     // Adds a floor to the stop list. Invalid floors and floors already in the list are ignored.
-    public void addStop(int floor) {
+    public synchronized void addStop(int floor) {
         if (!Request.isValidFloor(floor) || stops.contains(floor)) {
             return;
         }
         stops.add(floor);
+        notifyAll();    // wake the elevator thread if it is waiting with no stops
     }
 
-    public boolean hasStops() {
+    public synchronized boolean hasStops() {
         return !stops.isEmpty();
     }
 
     // Moves one floor toward the first stop. Does nothing if there are no stops.
-    public void moveOneStep() {
+    public synchronized void moveOneStep() {    // synchronized: changes stops, which addStop() also changes
         if (stops.isEmpty()) {
             state = ElevatorState.IDLE;
             direction = Direction.NONE;
@@ -69,46 +74,50 @@ public class Elevator implements Runnable {
     public void run() {
         try {
             while (running) {   // checked every loop, so the thread ends soon after stopRunning()
-                if (hasStops()) {
-                    moveOneStep();
-                    System.out.println(Thread.currentThread().getName() + " " + this);
+                synchronized (this) {
+                    while (running && stops.isEmpty()) {
+                        wait();     // idle: sleep until addStop() or stopRunning() calls notifyAll (while: re-check after waking)
+                    }
                 }
-                Thread.sleep(Config.FLOOR_TRAVEL_MS);   // sleep so the thread doesn't spin, and so one floor takes visible time
+                if (!running) {
+                    break;      // woken up by stopRunning(), not by a new stop
+                }
+                // move and sleep outside the lock: while sleeping, other threads must still be able to add stops
+                moveOneStep();
+                System.out.println(Thread.currentThread().getName() + " " + this);
+                Thread.sleep(Config.FLOOR_TRAVEL_MS);   // one floor takes visible time
             }
         } catch (InterruptedException e) {
-            // interrupt() woke the thread up from sleep(), so leave the loop right away
+            // interrupt() woke the thread up from sleep() or wait(), so leave the loop right away
         }
         System.out.println(Thread.currentThread().getName() + " stopped");
     }
 
     // Called from another thread (main) to ask this elevator to finish its loop.
-    public void stopRunning() {
+    public synchronized void stopRunning() {
         running = false;
+        notifyAll();    // an idle elevator is stuck in wait(), wake it so it sees running == false
     }
 
     public int getId() {
         return id;
     }
 
-    public int getCurrentFloor() {
+    public synchronized int getCurrentFloor() {
         return currentFloor;
     }
 
-    public ElevatorState getState() {
+    public synchronized ElevatorState getState() {
         return state;
     }
 
-    public Direction getDirection() {
+    public synchronized Direction getDirection() {
         return direction;
-    }
-
-    public ArrayList<Integer> getStops() {
-        return stops;
     }
 
     // Short form used in the console, e.g. "Elevator 1 | floor 7 | MOVING_UP | stops [10, 3]".
     @Override
-    public String toString() {
+    public synchronized String toString() {
         return "Elevator " + id + " | floor " + currentFloor + " | " + state + " | stops " + stops;
     }
 }
