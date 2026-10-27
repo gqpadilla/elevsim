@@ -3,6 +3,11 @@ package elevatorsim;
 import java.util.ArrayList;
 
 // One elevator car. Each elevator runs on its own thread (see run()).
+// ref: https://www.geeksforgeeks.org/java/lifecycle-and-states-of-a-thread-in-java/
+// idea: the elevator thread goes through these Thread states:
+//   RUNNABLE       moving one floor, printing (actually running code)
+//   TIMED_WAITING  Thread.sleep() between floors and while the doors are open
+//   WAITING        wait() when idle with no stops, until addStop() or stopRunning() calls notifyAll
 // ref: https://www.geeksforgeeks.org/java/arraylist-in-java/
 // idea: stops are kept in an ArrayList in the order they were added, the first one is served first
 // ref: https://www.geeksforgeeks.org/java/runnable-interface-in-java/
@@ -40,14 +45,11 @@ public class Elevator implements Runnable {
         return !stops.isEmpty();
     }
 
-    // Moves one floor toward the first stop. Does nothing if there are no stops.
-    public synchronized void moveOneStep() {    // synchronized: changes stops, which addStop() also changes
+    // Moves one floor toward the first stop. Returns true if it arrived at a stop (doors should open).
+    public synchronized boolean moveOneStep() {    // synchronized: changes stops, which addStop() also changes
         if (stops.isEmpty()) {
-            state = ElevatorState.IDLE;
-            direction = Direction.NONE;
-            return;
+            return false;   // nothing to do
         }
-
         int target = stops.get(0);
         if (target > currentFloor) {
             currentFloor++;
@@ -58,14 +60,24 @@ public class Elevator implements Runnable {
             direction = Direction.DOWN;
             state = ElevatorState.MOVING_DOWN;
         }
-
-        // Arrived: drop the stop. If it was the last one, the elevator is idle again.
         if (currentFloor == target) {
-            stops.remove(0);
-            if (stops.isEmpty()) {
-                state = ElevatorState.IDLE;
-                direction = Direction.NONE;
-            }
+            arriveAtFloor();
+            return true;
+        }
+        return false;
+    }
+
+    // Reached the first stop: drop it and open the doors. Called with the lock held (from moveOneStep).
+    private void arriveAtFloor() {
+        stops.remove(0);
+        state = ElevatorState.DOORS_OPEN;
+    }
+
+    // Doors are closed again: idle if there's nothing left, otherwise the next moveOneStep() sets MOVING_*.
+    public synchronized void closeDoors() {
+        if (stops.isEmpty()) {
+            state = ElevatorState.IDLE;
+            direction = Direction.NONE;
         }
     }
 
@@ -83,14 +95,29 @@ public class Elevator implements Runnable {
                     break;      // woken up by stopRunning(), not by a new stop
                 }
                 // move and sleep outside the lock: while sleeping, other threads must still be able to add stops
-                moveOneStep();
+                boolean arrived = moveOneStep();
                 System.out.println(Thread.currentThread().getName() + " " + this);
-                Thread.sleep(Config.FLOOR_TRAVEL_MS);   // one floor takes visible time
+                if (arrived) {
+                    openAndCloseDoors();
+                } else {
+                    Thread.sleep(Config.FLOOR_TRAVEL_MS);   // one floor takes visible time
+                }
             }
         } catch (InterruptedException e) {
             // interrupt() woke the thread up from sleep() or wait(), so leave the loop right away
         }
         System.out.println(Thread.currentThread().getName() + " stopped");
+    }
+
+    // Doors open, people get in/out, doors close. Runs on the elevator thread, sleeps without holding the lock.
+    private void openAndCloseDoors() throws InterruptedException {
+        String name = Thread.currentThread().getName();
+        System.out.println(name + " doors open at floor " + getCurrentFloor());
+        // ref: https://www.geeksforgeeks.org/java/thread-sleep-method-in-java-with-examples/
+        // idea: sleep() pauses only this elevator's thread, the other elevators keep moving
+        Thread.sleep(Config.DOOR_OPEN_MS);  // not inside synchronized: main must still be able to add stops meanwhile
+        closeDoors();
+        System.out.println(name + " doors closed");
     }
 
     // Called from another thread (main) to ask this elevator to finish its loop.

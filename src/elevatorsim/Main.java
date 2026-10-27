@@ -46,7 +46,9 @@ public class Main {
 
         // Loop ends when the last stop is reached, so the elevator is idle at floor 3.
         while (e.hasStops()) {
-            e.moveOneStep();
+            if (e.moveOneStep()) {
+                e.closeDoors();     // no thread here, so close the doors right away instead of waiting
+            }
             System.out.println("  " + e);
         }
         System.out.println();   // blank line before the next message
