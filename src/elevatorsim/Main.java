@@ -52,22 +52,28 @@ public class Main {
         System.out.println();   // blank line before the next message
     }
 
-    // Gives each elevator 2 stops, then runs one thread per elevator for 10 s and stops them.
+    // Starts the elevators with no stops, then the main thread hands out stops over time (like a dispatcher would).
     private static void testBuilding() throws InterruptedException {
         System.out.println("Building:");
         Building b = new Building();
-        b.getElevator(1).addStop(10);
-        b.getElevator(1).addStop(3);
-        b.getElevator(2).addStop(20);
-        b.getElevator(2).addStop(5);
-        b.getElevator(3).addStop(15);
-        b.getElevator(3).addStop(8);
-        b.getElevator(4).addStop(30);
-        b.getElevator(4).addStop(2);
         b.printStatus();
-
         b.startAll();
-        Thread.sleep(10000);   // arbitrary, from the plan; long enough to watch the elevators move
+
+        Thread.sleep(2000);     // arbitrary: 2 s of silence shows idle elevators wait instead of looping
+        System.out.println("main: stop 8 for elevator 1");
+        b.getElevator(1).addStop(8);
+        Thread.sleep(1000);     // arbitrary gap, so the stops arrive while elevator 1 is already moving
+        System.out.println("main: stop 15 for elevator 2, stop 4 for elevator 3");
+        b.getElevator(2).addStop(15);
+        b.getElevator(3).addStop(4);
+        Thread.sleep(2000);
+        System.out.println("main: stop 12 for elevator 4");
+        b.getElevator(4).addStop(12);
+        Thread.sleep(2000);
+        System.out.println("main: stop 2 for elevator 1");
+        b.getElevator(1).addStop(2);    // elevator 1 is idle at 8 by now, this wakes it up again
+        Thread.sleep(5000);     // 2+1+2+2+5 = 12 s total, every trip above is done by about 10.5 s
+
         b.stopAll();
         System.out.println("all elevator threads finished");
     }
