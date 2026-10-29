@@ -1,6 +1,6 @@
 package elevatorsim;
 
-// Entry point of the program. For now it only prints a banner and the config values.
+// Entry point of the program: prints the banner and config, runs the small tests, then the simulation.
 public class Main {
 
     public static void main(String[] args) throws InterruptedException {
@@ -11,10 +11,7 @@ public class Main {
         printConfig();
         testRequests();
         testElevator();
-        testBuilding();
-        testQueue();
-        System.out.println("Simulation not implemented yet.");
-        // TODO: start the simulation here once the classes exist
+        runSimulation();
     }
 
     // Makes a few sample requests and checks the direction and validity of each.
@@ -54,77 +51,30 @@ public class Main {
         System.out.println();   // blank line before the next message
     }
 
-    // Starts the elevators with no stops, then the main thread hands out stops over time (like a dispatcher would).
-    private static void testBuilding() throws InterruptedException {
-        System.out.println("Building:");
-        Building b = new Building();
-        b.printStatus();
-        b.startAll();
+    // Main is the producer: it adds requests to the queue, the dispatcher thread hands them to the elevators.
+    private static void runSimulation() throws InterruptedException {
+        System.out.println("Simulation:");
+        Building building = new Building();
+        RequestQueue queue = new RequestQueue();
+        Thread dispatcher = new Thread(new Dispatcher(building, queue), "Dispatcher");
 
-        Thread.sleep(2000);     // arbitrary: 2 s of silence shows idle elevators wait instead of looping
-        System.out.println("main: stop 8 for elevator 1");
-        b.getElevator(1).addStop(8);
-        Thread.sleep(1000);     // arbitrary gap, so the stops arrive while elevator 1 is already moving
-        System.out.println("main: stop 15 for elevator 2, stop 4 for elevator 3");
-        b.getElevator(2).addStop(15);
-        b.getElevator(3).addStop(4);
-        Thread.sleep(2000);
-        System.out.println("main: stop 12 for elevator 4");
-        b.getElevator(4).addStop(12);
-        Thread.sleep(2000);
-        System.out.println("main: stop 2 for elevator 1");
-        b.getElevator(1).addStop(2);    // elevator 1 is idle at 8 by now, this wakes it up again
-        Thread.sleep(5000);     // 2+1+2+2+5 = 12 s total, every trip above is done by about 10.5 s
+        building.startAll();
+        dispatcher.start();
 
-        b.stopAll();
-        System.out.println("all elevator threads finished");
-    }
+        int[][] trips = { {10, 1}, {3, 20}, {25, 1}, {7, 30}, {18, 2}, {2, 18} };  // arbitrary: spread over the floors
+        int[] gaps = { 1000, 1000, 1500, 1500, 1000, 0 };  // arbitrary ms between requests, so elevators are mid-trip
+        for (int i = 0; i < trips.length; i++) {
+            Request r = new Request(0, trips[i][0], trips[i][1]);
+            System.out.println("main: new request " + r);
+            queue.add(r);
+            Thread.sleep(gaps[i]);
+        }
 
-    // Producer thread adds 5 requests, consumer thread takes and prints them as they arrive.
-    private static void testQueue() throws InterruptedException {
-        System.out.println();
-        System.out.println("Queue:");
-        final RequestQueue queue = new RequestQueue();
-
-        Thread producer = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int[][] trips = { {5, 32}, {40, 3}, {1, 50}, {12, 7}, {22, 45} };  // arbitrary sample trips
-                try {
-                    for (int[] t : trips) {
-                        Request r = new Request(0, t[0], t[1]);
-                        System.out.println("  added " + r);   // print before add(), so "added" always shows before "took"
-                        queue.add(r);
-                        Thread.sleep(700);  // arbitrary gap between requests, so each take() has to wait
-                    }
-                } catch (InterruptedException e) {
-                    // not interrupted in this test, nothing to clean up
-                }
-            }
-        }, "Producer");
-
-        Thread consumer = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Request r = queue.take();
-                    while (r != null) {     // null means the queue is closed and empty
-                        System.out.println("  took " + r);
-                        r = queue.take();
-                    }
-                } catch (InterruptedException e) {
-                    // not interrupted in this test, nothing to clean up
-                }
-                System.out.println("  consumer done");
-            }
-        }, "Consumer");
-
-        producer.start();
-        consumer.start();
-        producer.join();    // wait until all 5 requests are added
-        queue.close();      // then tell the consumer no more are coming
-        consumer.join();    // wait until it has taken everything and ended
-        System.out.println();   // blank line before the next message
+        Thread.sleep(15000);    // arbitrary demo length; elevators still busy when it ends are stopped mid-trip
+        queue.close();          // no more requests, the dispatcher's take() returns null
+        dispatcher.join();      // wait until the dispatcher has finished
+        building.stopAll();
+        System.out.println("all threads finished");
     }
 
     // Prints every value from Config so the settings can be checked at a glance.
