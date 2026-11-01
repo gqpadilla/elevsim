@@ -61,8 +61,10 @@ public class Main {
         building.startAll();
         dispatcher.start();
 
-        int[][] trips = { {10, 1}, {3, 20}, {25, 1}, {7, 30}, {18, 2}, {2, 18} };  // arbitrary: spread over the floors
-        int[] gaps = { 1000, 1000, 1500, 1500, 1000, 0 };  // arbitrary ms between requests, so elevators are mid-trip
+        // E1 heads up to 20, then pickups at 8 and 14 come in below it on the same way up: SCAN serves 8, 14, 20, 30
+        // in one sweep instead of zig-zagging. 30 -> 2 comes from the top end, 3 -> 1 from the bottom end.
+        int[][] trips = { {20, 45}, {8, 30}, {14, 40}, {30, 2}, {3, 1} };
+        int[] gaps = { 1000, 1000, 500, 500, 0 };   // arbitrary ms between requests, so E1 is already moving up
         for (int i = 0; i < trips.length; i++) {
             Request r = new Request(0, trips[i][0], trips[i][1]);
             System.out.println("main: new request " + r);
@@ -70,7 +72,7 @@ public class Main {
             Thread.sleep(gaps[i]);
         }
 
-        Thread.sleep(15000);    // arbitrary demo length; elevators still busy when it ends are stopped mid-trip
+        Thread.sleep(17000);    // arbitrary: E1's sweep 1 -> 30 is 29 floors (~14.5 s) plus 4 door stops (~4 s)
         queue.close();          // no more requests, the dispatcher's take() returns null
         dispatcher.join();      // wait until the dispatcher has finished
         building.stopAll();

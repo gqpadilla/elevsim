@@ -33,20 +33,39 @@ public class Dispatcher implements Runnable {
         System.out.println("Dispatcher stopped");
     }
 
-    // Simple version: the elevator closest to the pickup floor. On a tie, an IDLE one wins.
+    // Picks the elevator with the lowest cost (about how many floors it travels before reaching the pickup):
+    //   idle                                         -> cost = distance
+    //   moving toward the pickup, same way as request -> cost = distance (it passes the floor on the way)
+    //   otherwise -> it first finishes its trip: distance to its farthest stop + from there to the pickup
     private Elevator chooseElevator(Request r) {
         Elevator best = null;
-        int bestDistance = Integer.MAX_VALUE;   // so the first elevator always counts as closer
+        int bestCost = Integer.MAX_VALUE;   // so the first elevator always counts as cheaper
         for (Elevator e : building.getElevators()) {
-            int distance = Math.abs(e.getCurrentFloor() - r.getFromFloor());  // floors away, sign doesn't matter
-            boolean tieButIdle = distance == bestDistance
-                    && e.getState() == ElevatorState.IDLE
-                    && best.getState() != ElevatorState.IDLE;
-            if (distance < bestDistance || tieButIdle) {
+            int cost = cost(e, r);
+            if (cost < bestCost) {
                 best = e;
-                bestDistance = distance;
+                bestCost = cost;
             }
         }
         return best;
+    }
+
+    // shortcut: reads floor/state/direction with separate calls, so the elevator may move in between;
+    // fine for an estimate, read them in one synchronized call if exact numbers ever matter
+    private int cost(Elevator e, Request r) {
+        int floor = e.getCurrentFloor();
+        int pickup = r.getFromFloor();
+        int distance = Math.abs(floor - pickup);    // floors away, sign doesn't matter
+        if (e.getState() == ElevatorState.IDLE) {
+            return distance;
+        }
+        Direction d = e.getDirection();
+        boolean onTheWayUp = d == Direction.UP && pickup >= floor && r.getDirection() == Direction.UP;
+        boolean onTheWayDown = d == Direction.DOWN && pickup <= floor && r.getDirection() == Direction.DOWN;
+        if (onTheWayUp || onTheWayDown) {
+            return distance;
+        }
+        int farthest = e.getFarthestStop();
+        return Math.abs(farthest - floor) + Math.abs(farthest - pickup);
     }
 }
