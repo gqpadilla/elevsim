@@ -9,7 +9,7 @@ import java.util.ArrayList;
 //   TIMED_WAITING  Thread.sleep() between floors and while the doors are open
 //   WAITING        wait() when idle with no stops, until addStop() or stopRunning() calls notifyAll
 // ref: https://www.geeksforgeeks.org/java/arraylist-in-java/
-// idea: stops are kept in an ArrayList in the order they were added, the first one is served first
+// idea: stops are kept in an ArrayList; the order doesn't matter, SCAN picks the next one (see moveOneStep)
 // ref: https://www.geeksforgeeks.org/java/runnable-interface-in-java/
 // idea: run() is the code a thread executes, so each elevator gets its own run() loop
 public class Elevator implements Runnable {
@@ -45,31 +45,84 @@ public class Elevator implements Runnable {
         return !stops.isEmpty();
     }
 
-    // Moves one floor toward the first stop. Returns true if it arrived at a stop (doors should open).
+    // ref: https://www.geeksforgeeks.org/operating-systems/scan-elevator-disk-scheduling-algorithms/
+    // idea: SCAN = keep going the same way while there are stops ahead, only turn around when there are none
+
+    // Moves one floor using SCAN. Returns true if it arrived at a stop (doors should open).
     public synchronized boolean moveOneStep() {    // synchronized: changes stops, which addStop() also changes
         if (stops.isEmpty()) {
             return false;   // nothing to do
         }
-        int target = stops.get(0);
-        if (target > currentFloor) {
+        if (stops.contains(currentFloor)) {
+            arriveAtFloor();    // a stop for the floor we're already on (e.g. added while the doors were open)
+            return true;
+        }
+        chooseDirection();
+        if (direction == Direction.UP) {
             currentFloor++;
-            direction = Direction.UP;
             state = ElevatorState.MOVING_UP;
-        } else if (target < currentFloor) {
+        } else {
             currentFloor--;
-            direction = Direction.DOWN;
             state = ElevatorState.MOVING_DOWN;
         }
-        if (currentFloor == target) {
-            arriveAtFloor();
+        if (stops.contains(currentFloor)) {
+            arriveAtFloor();    // any stop counts, not just the first one added: that's what stops the zig-zag
             return true;
         }
         return false;
     }
 
-    // Reached the first stop: drop it and open the doors. Called with the lock held (from moveOneStep).
+    // Keep the current direction while there are stops ahead, otherwise turn around. Lock held by caller.
+    private void chooseDirection() {
+        if (direction == Direction.UP && hasStopAbove()) {
+            return;     // still stops above, keep going up
+        }
+        if (direction == Direction.DOWN && hasStopBelow()) {
+            return;     // still stops below, keep going down
+        }
+        // nothing ahead (or we were idle): go wherever the stops are. stops isn't empty and none is on this floor,
+        // so one of the two is true
+        if (hasStopAbove()) {
+            direction = Direction.UP;
+        } else {
+            direction = Direction.DOWN;
+        }
+    }
+
+    private boolean hasStopAbove() {
+        for (int f : stops) {
+            if (f > currentFloor) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasStopBelow() {
+        for (int f : stops) {
+            if (f < currentFloor) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The last stop in the current direction (where the elevator will turn around). Current floor if none.
+    public synchronized int getFarthestStop() {
+        int farthest = currentFloor;
+        for (int f : stops) {
+            if (direction == Direction.UP && f > farthest) {
+                farthest = f;
+            } else if (direction == Direction.DOWN && f < farthest) {
+                farthest = f;
+            }
+        }
+        return farthest;
+    }
+
+    // Reached a stop: drop it and open the doors. Called with the lock held (from moveOneStep).
     private void arriveAtFloor() {
-        stops.remove(0);
+        stops.remove(Integer.valueOf(currentFloor));    // Integer.valueOf: remove the floor value, not the item at that index
         state = ElevatorState.DOORS_OPEN;
     }
 
