@@ -6,10 +6,12 @@ public class Building {
     private Elevator[] elevators = new Elevator[Config.NUM_ELEVATORS];
     private Thread[] threads = new Thread[Config.NUM_ELEVATORS];  // kept so stopAll() can interrupt() and join() them
 
-    public Building() {
+    // queue: where a full elevator puts back the passengers it couldn't take
+    public Building(RequestQueue queue) {
         // ids 1..4 for the elevators, matching the numbers people see on the screen
         for (int i = 0; i < elevators.length; i++) {
             elevators[i] = new Elevator(i + 1);  // array index starts at 0, elevator ids start at 1
+            elevators[i].setQueue(queue);
         }
     }
 

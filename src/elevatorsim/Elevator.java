@@ -19,6 +19,9 @@ public class Elevator implements Runnable {
     private ElevatorState state = ElevatorState.IDLE;
     private Direction direction = Direction.NONE;    // NONE while standing still
     private ArrayList<Integer> stops = new ArrayList<Integer>();
+    private ArrayList<Request> pickups = new ArrayList<Request>();      // assigned to us, still waiting on their floor
+    private ArrayList<Request> passengers = new ArrayList<Request>();   // inside the elevator
+    private RequestQueue queue;     // where requests go back if we are full (set by Building)
 
     // ref: https://www.geeksforgeeks.org/java/volatile-keyword-in-java/
     // idea: volatile so the elevator thread sees the change when the main thread sets it to false
@@ -26,6 +29,11 @@ public class Elevator implements Runnable {
 
     public Elevator(int id) {
         this.id = id;
+    }
+
+    // Called by Building, so a full elevator can hand requests back to the dispatcher.
+    public void setQueue(RequestQueue queue) {
+        this.queue = queue;
     }
 
     // ref: https://www.geeksforgeeks.org/java/synchronization-in-java/
@@ -39,6 +47,17 @@ public class Elevator implements Runnable {
         }
         stops.add(floor);
         notifyAll();    // wake the elevator thread if it is waiting with no stops
+    }
+
+    // The dispatcher gives us a passenger: remember them and go to their floor.
+    public synchronized void assignRequest(Request r) {
+        pickups.add(r);
+        addStop(r.getFromFloor());  // same lock (synchronized methods can call each other), so this is fine
+    }
+
+    // People inside plus people we still have to pick up. The dispatcher uses it to avoid full elevators.
+    public synchronized int getLoad() {
+        return passengers.size() + pickups.size();
     }
 
     public synchronized boolean hasStops() {
@@ -120,10 +139,46 @@ public class Elevator implements Runnable {
         return farthest;
     }
 
-    // Reached a stop: drop it and open the doors. Called with the lock held (from moveOneStep).
+    // Reached a stop: drop it, open the doors, let people out and in. Called with the lock held (from moveOneStep).
     private void arriveAtFloor() {
         stops.remove(Integer.valueOf(currentFloor));    // Integer.valueOf: remove the floor value, not the item at that index
         state = ElevatorState.DOORS_OPEN;
+        dropOffPassengers();
+        pickUpPassengers();
+    }
+
+    // Everyone whose destination is this floor gets out.
+    private void dropOffPassengers() {
+        // backwards, so removing an item doesn't shift the ones we haven't checked yet
+        for (int i = passengers.size() - 1; i >= 0; i--) {
+            Request p = passengers.get(i);
+            if (p.getToFloor() == currentFloor) {
+                passengers.remove(i);
+                System.out.println(p + " dropped at " + currentFloor + " by Elevator " + id);
+            }
+        }
+    }
+
+    // Everyone waiting on this floor gets in while there's room. The rest go back to the queue.
+    private void pickUpPassengers() {
+        for (int i = pickups.size() - 1; i >= 0; i--) {     // backwards, same reason as dropOffPassengers()
+            Request p = pickups.get(i);
+            if (p.getFromFloor() != currentFloor) {
+                continue;   // waiting on another floor
+            }
+            pickups.remove(i);
+            if (passengers.size() < Config.CAPACITY) {
+                passengers.add(p);
+                addStop(p.getToFloor());
+                System.out.println(p + " picked up at " + currentFloor + " by Elevator " + id);
+            } else {
+                // ref: https://www.geeksforgeeks.org/java/producer-consumer-solution-using-threads-java/
+                // idea: the elevator becomes a producer here, the dispatcher takes the request again
+                // safe to call while holding our lock: nobody holds the queue lock while waiting for an elevator
+                System.out.println(p + " left at " + currentFloor + ", Elevator " + id + " is full");
+                queue.add(p);
+            }
+        }
     }
 
     // Doors are closed again: idle if there's nothing left, otherwise the next moveOneStep() sets MOVING_*.

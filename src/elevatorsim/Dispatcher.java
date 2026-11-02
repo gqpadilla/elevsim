@@ -22,9 +22,8 @@ public class Dispatcher implements Runnable {
                 // take() has returned, so the queue lock is released here:
                 // don't hold queue lock while calling elevator (avoid deadlock)
                 Elevator e = chooseElevator(r);
-                e.addStop(r.getFromFloor());
-                // TODO: only goes to the pickup floor for now, passengers ride to toFloor on Day 13
-                System.out.println("Dispatcher: " + r + " -> Elevator " + e.getId());
+                System.out.println("Dispatcher: " + r + " -> Elevator " + e.getId());  // print first, so it shows before the elevator moves
+                e.assignRequest(r);
                 r = queue.take();
             }
         } catch (InterruptedException e) {
@@ -37,6 +36,7 @@ public class Dispatcher implements Runnable {
     //   idle                                         -> cost = distance
     //   moving toward the pickup, same way as request -> cost = distance (it passes the floor on the way)
     //   otherwise -> it first finishes its trip: distance to its farthest stop + from there to the pickup
+    //   full (load >= CAPACITY) -> +100 on top, so a full elevator is only picked if every elevator is full
     private Elevator chooseElevator(Request r) {
         Elevator best = null;
         int bestCost = Integer.MAX_VALUE;   // so the first elevator always counts as cheaper
@@ -53,6 +53,15 @@ public class Dispatcher implements Runnable {
     // shortcut: reads floor/state/direction with separate calls, so the elevator may move in between;
     // fine for an estimate, read them in one synchronized call if exact numbers ever matter
     private int cost(Elevator e, Request r) {
+        int cost = travelCost(e, r);
+        if (e.getLoad() >= Config.CAPACITY) {
+            cost += 100;    // arbitrary big penalty (more than any trip in a 50 floor building) so a full elevator is picked last
+        }
+        return cost;
+    }
+
+    // How many floors the elevator travels before it can reach the pickup floor.
+    private int travelCost(Elevator e, Request r) {
         int floor = e.getCurrentFloor();
         int pickup = r.getFromFloor();
         int distance = Math.abs(floor - pickup);    // floors away, sign doesn't matter

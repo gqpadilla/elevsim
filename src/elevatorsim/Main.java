@@ -54,25 +54,23 @@ public class Main {
     // Main is the producer: it adds requests to the queue, the dispatcher thread hands them to the elevators.
     private static void runSimulation() throws InterruptedException {
         System.out.println("Simulation:");
-        Building building = new Building();
         RequestQueue queue = new RequestQueue();
+        Building building = new Building(queue);    // elevators get the queue so a full one can give requests back
         Thread dispatcher = new Thread(new Dispatcher(building, queue), "Dispatcher");
 
         building.startAll();
         dispatcher.start();
 
-        // E1 heads up to 20, then pickups at 8 and 14 come in below it on the same way up: SCAN serves 8, 14, 20, 30
-        // in one sweep instead of zig-zagging. 30 -> 2 comes from the top end, 3 -> 1 from the bottom end.
-        int[][] trips = { {20, 45}, {8, 30}, {14, 40}, {30, 2}, {3, 1} };
-        int[] gaps = { 1000, 1000, 500, 500, 0 };   // arbitrary ms between requests, so E1 is already moving up
+        // 8 passengers, going up and down from different floors (arbitrary, spread over the lower 30 floors)
+        int[][] trips = { {1, 12}, {5, 20}, {15, 3}, {8, 2}, {20, 30}, {30, 10}, {2, 9}, {12, 25} };
         for (int i = 0; i < trips.length; i++) {
             Request r = new Request(0, trips[i][0], trips[i][1]);
             System.out.println("main: new request " + r);
             queue.add(r);
-            Thread.sleep(gaps[i]);
+            Thread.sleep(700);  // arbitrary gap between requests, so the elevators are already moving
         }
 
-        Thread.sleep(17000);    // arbitrary: E1's sweep 1 -> 30 is 29 floors (~14.5 s) plus 4 door stops (~4 s)
+        Thread.sleep(35000);    // arbitrary: the longest ride here is ~56 floors (~28 s) plus door stops
         queue.close();          // no more requests, the dispatcher's take() returns null
         dispatcher.join();      // wait until the dispatcher has finished
         building.stopAll();
