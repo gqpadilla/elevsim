@@ -54,6 +54,7 @@ public class Main {
     // Main is the producer: it adds requests to the queue, the dispatcher thread hands them to the elevators.
     private static void runSimulation() throws InterruptedException {
         System.out.println("Simulation:");
+        SimLogger.start();  // times in the log start at 0.0 s here
         RequestQueue queue = new RequestQueue();
         Building building = new Building(queue);    // elevators get the queue so a full one can give requests back
         Thread dispatcher = new Thread(new Dispatcher(building, queue), "Dispatcher");
@@ -65,7 +66,7 @@ public class Main {
         int[][] trips = { {1, 12}, {5, 20}, {15, 3}, {8, 2}, {20, 30}, {30, 10}, {2, 9}, {12, 25} };
         for (int i = 0; i < trips.length; i++) {
             Request r = new Request(0, trips[i][0], trips[i][1]);
-            System.out.println("main: new request " + r);
+            SimLogger.log("new request " + r);
             queue.add(r);
             Thread.sleep(700);  // arbitrary gap between requests, so the elevators are already moving
         }
@@ -74,7 +75,7 @@ public class Main {
         queue.close();          // no more requests, the dispatcher's take() returns null
         dispatcher.join();      // wait until the dispatcher has finished
         building.stopAll();
-        System.out.println("all threads finished");
+        SimLogger.log("all threads finished");
     }
 
     // Prints every value from Config so the settings can be checked at a glance.

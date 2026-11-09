@@ -24,13 +24,6 @@ public class Building {
         return elevators;
     }
 
-    // One line per elevator.
-    public void printStatus() {
-        for (Elevator e : elevators) {
-            System.out.println("  " + e);
-        }
-    }
-
     // Starts one thread per elevator. The thread name shows up in the output, e.g. "Elevator-1".
     // ref: https://www.geeksforgeeks.org/java/java-threads/
     // idea: start() creates a new thread that runs the elevator's run() method at the same time as the others

@@ -154,7 +154,7 @@ public class Elevator implements Runnable {
             Request p = passengers.get(i);
             if (p.getToFloor() == currentFloor) {
                 passengers.remove(i);
-                System.out.println(p + " dropped at " + currentFloor + " by Elevator " + id);
+                SimLogger.log(p + " dropped at " + currentFloor + " by Elevator " + id);
             }
         }
     }
@@ -170,12 +170,12 @@ public class Elevator implements Runnable {
             if (passengers.size() < Config.CAPACITY) {
                 passengers.add(p);
                 addStop(p.getToFloor());
-                System.out.println(p + " picked up at " + currentFloor + " by Elevator " + id);
+                SimLogger.log(p + " picked up at " + currentFloor + " by Elevator " + id);
             } else {
                 // ref: https://www.geeksforgeeks.org/java/producer-consumer-solution-using-threads-java/
                 // idea: the elevator becomes a producer here, the dispatcher takes the request again
                 // safe to call while holding our lock: nobody holds the queue lock while waiting for an elevator
-                System.out.println(p + " left at " + currentFloor + ", Elevator " + id + " is full");
+                SimLogger.log(p + " left at " + currentFloor + ", Elevator " + id + " is full");
                 queue.add(p);
             }
         }
@@ -204,7 +204,7 @@ public class Elevator implements Runnable {
                 }
                 // move and sleep outside the lock: while sleeping, other threads must still be able to add stops
                 boolean arrived = moveOneStep();
-                System.out.println(Thread.currentThread().getName() + " " + this);
+                SimLogger.log(toString());   // the logger already adds the thread name
                 if (arrived) {
                     openAndCloseDoors();
                 } else {
@@ -214,18 +214,17 @@ public class Elevator implements Runnable {
         } catch (InterruptedException e) {
             // interrupt() woke the thread up from sleep() or wait(), so leave the loop right away
         }
-        System.out.println(Thread.currentThread().getName() + " stopped");
+        SimLogger.log("stopped");
     }
 
     // Doors open, people get in/out, doors close. Runs on the elevator thread, sleeps without holding the lock.
     private void openAndCloseDoors() throws InterruptedException {
-        String name = Thread.currentThread().getName();
-        System.out.println(name + " doors open at floor " + getCurrentFloor());
+        SimLogger.log("doors open at floor " + getCurrentFloor());
         // ref: https://www.geeksforgeeks.org/java/thread-sleep-method-in-java-with-examples/
         // idea: sleep() pauses only this elevator's thread, the other elevators keep moving
         Thread.sleep(Config.DOOR_OPEN_MS);  // not inside synchronized: main must still be able to add stops meanwhile
         closeDoors();
-        System.out.println(name + " doors closed");
+        SimLogger.log("doors closed");
     }
 
     // Called from another thread (main) to ask this elevator to finish its loop.

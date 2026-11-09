@@ -22,14 +22,14 @@ public class Dispatcher implements Runnable {
                 // take() has returned, so the queue lock is released here:
                 // don't hold queue lock while calling elevator (avoid deadlock)
                 Elevator e = chooseElevator(r);
-                System.out.println("Dispatcher: " + r + " -> Elevator " + e.getId());  // print first, so it shows before the elevator moves
+                SimLogger.log(r + " -> Elevator " + e.getId());  // print first, so it shows before the elevator moves
                 e.assignRequest(r);
                 r = queue.take();
             }
         } catch (InterruptedException e) {
             // interrupted while waiting in take(), just stop
         }
-        System.out.println("Dispatcher stopped");
+        SimLogger.log("stopped");
     }
 
     // Picks the elevator with the lowest cost (about how many floors it travels before reaching the pickup):
