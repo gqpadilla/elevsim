@@ -1,5 +1,8 @@
 package elevatorsim;
 
+import java.io.IOException;
+import java.util.ArrayList;
+
 // Entry point of the program: prints the banner and config, runs the small tests, then the simulation.
 public class Main {
 
@@ -12,6 +15,16 @@ public class Main {
         testRequests();
         testElevator();
         runSimulation();
+
+        try {
+            ArrayList<Request> requests = CsvLoader.load("data/sample_basic.csv");
+            System.out.println("Loaded " + requests.size() + " requests.");
+            for (int i = 0; i < Math.min(3, requests.size()); i++) {
+                System.out.println(requests.get(i));
+            }
+        } catch (IOException e) {
+            SimLogger.log("Failed to load requests " + e.getMessage());
+        }
     }
 
     // Makes a few sample requests and checks the direction and validity of each.
